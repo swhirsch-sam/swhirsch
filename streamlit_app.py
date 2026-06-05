@@ -26,19 +26,23 @@ def run_research(topic: str) -> str:
 
     prompt = (
         f"You are a trend intelligence analyst. Search the web for the latest developments in: **{topic}**\n\n"
-        "Write a structured trend brief using these exact section headers:\n\n"
+        "Write a structured trend brief using these exact section headers. "
+        "Keep every section tight: short bullet points only, no paragraphs.\n\n"
         "**TOP STORY**\n"
-        "2-3 sentences on the single most significant development right now. Cite the source.\n\n"
+        "- [Source name]: one-sentence summary of the biggest development\n"
+        "- 1-2 more bullet points of essential context\n\n"
         "**NARRATIVE THREADS**\n"
-        "- Thread 1 name: 1-2 sentences\n"
-        "- Thread 2 name: 1-2 sentences\n"
-        "- Thread 3 name: 1-2 sentences\n\n"
+        "- Thread name: one sentence\n"
+        "- Thread name: one sentence\n"
+        "- Thread name: one sentence\n\n"
         "**SENTIMENT SNAPSHOT**\n"
-        "2-3 sentences on the overall mood and what is driving it.\n\n"
+        "- Overall mood (optimistic/cautious/uncertain): one sentence why\n"
+        "- 1-2 bullet points on key drivers\n\n"
         "**EMERGING SIGNAL**\n"
-        "2-3 sentences on one early signal not yet mainstream but worth watching.\n\n"
+        "- Signal: one sentence describing it\n"
+        "- Why it matters: one sentence\n\n"
         "**SO WHAT**\n"
-        "2-3 sentences on the key takeaway for a practitioner in this space.\n\n"
+        "- 2-3 bullet points: actionable takeaways for a practitioner\n\n"
         "**TREND SIGNALS**\n"
         "4-6 short trend labels (2-5 words each), comma-separated.\n"
         "Example: AI-Generated Ads, Influencer Regulation, Shoppable Video"
@@ -124,7 +128,7 @@ st.markdown(
 )
 
 st.title("Trend Intelligence Dashboard")
-st.caption("Real-time research synthesized by Claude - Powered by web search")
+st.caption("Real-time research synthesized by Claude - Web search - Data reflects recent days")
 
 col_input, col_btn = st.columns([5, 1])
 with col_input:
