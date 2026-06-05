@@ -52,11 +52,22 @@ Write a structured trend brief using these exact section headers:
 
 2–3 sentences on the key takeaway for a practitioner in this space. Bold the most critical action or insight.
 
+**LEARN MORE**
+
+2–3 recommended resources—online courses, key articles, or authoritative guides—for going deeper on this topic. Format each as:
+• [Resource Title](https://actual-url.com) — one sentence on what it covers and why it's worth reading.
+
 **TREND SIGNALS**
 
 4–6 short trend labels (2–5 words each), comma-separated.
 
 Example: AI-Generated Ads, Influencer Regulation, Shoppable Video
+
+**RELATED TOPICS**
+
+4–5 related topics (2–5 words each) a reader might want to explore next, comma-separated.
+
+Example: Voice Search Optimization, AR Commerce, Creator Economy
 
 Formatting rules:
 - Always use real, clickable URLs: [Publication Name](https://actual-url.com)
@@ -101,8 +112,16 @@ def parse_signals(text: str) -> list[str]:
     return [c for c in cleaned if 2 < len(c) <= 50][:6]
 
 
+def parse_related_topics(text: str) -> list[str]:
+    raw = parse_section(text, "RELATED TOPICS")
+    if not raw:
+        return []
+    parts = re.split(r"[,\n;•\-–]", raw)
+    cleaned = [p.strip().strip("\"'*•–") for p in parts]
+    return [c for c in cleaned if 2 < len(c) <= 60][:5]
+
+
 def md_to_html(text: str) -> str:
-    """Convert markdown links and **bold** to HTML for injection into HTML card divs."""
     # [text](url) → clickable anchor
     text = re.sub(
         r'\[([^\]]+)\]\((https?://[^\)]+)\)',
@@ -146,12 +165,18 @@ st.markdown(
     color: #6B7280;
     margin: 0 0 6px;
 }
-.card-green  { background:#F0FDF4; border-left:4px solid #16A34A; padding:14px 18px;
-               border-radius:0 6px 6px 0; line-height:1.65; margin:6px 0 14px; }
-.card-amber  { background:#FFFBEB; border-left:4px solid #D97706; padding:14px 18px;
-               border-radius:0 6px 6px 0; line-height:1.65; margin:6px 0; }
-.card-purple { background:#FDF4FF; border-left:4px solid #9333EA; padding:14px 18px;
-               border-radius:0 6px 6px 0; line-height:1.65; margin:6px 0; }
+.card-green   { background:#F0FDF4; border-left:4px solid #16A34A; padding:14px 18px;
+                border-radius:0 6px 6px 0; line-height:1.65; margin:6px 0 14px; }
+.card-amber   { background:#FFFBEB; border-left:4px solid #D97706; padding:14px 18px;
+                border-radius:0 6px 6px 0; line-height:1.65; margin:6px 0; }
+.card-purple  { background:#FDF4FF; border-left:4px solid #9333EA; padding:14px 18px;
+                border-radius:0 6px 6px 0; line-height:1.65; margin:6px 0; }
+.card-slate   { background:#F8FAFC; border-left:4px solid #64748B; padding:14px 18px;
+                border-radius:0 6px 6px 0; line-height:1.65; margin:6px 0 14px; }
+.card-threads { background:#FAFAFA; border-left:4px solid #D1D5DB; padding:14px 18px;
+                border-radius:0 6px 6px 0; line-height:1.75; margin:6px 0 14px; }
+.card-blue    { background:#EFF6FF; border-left:4px solid #2563EB; padding:14px 18px;
+                border-radius:0 6px 6px 0; line-height:1.65; margin:6px 0; }
 mark {
     background: #FEF08A;
     color: #713F12;
@@ -159,14 +184,16 @@ mark {
     padding: 0 2px;
     font-weight: 600;
 }
-.card-green a, .card-amber a, .card-purple a {
+.card-green a, .card-amber a, .card-purple a,
+.card-slate a, .card-threads a, .card-blue a {
     color: #1D4ED8;
     font-weight: 500;
     text-decoration: underline;
     text-decoration-color: #BFDBFE;
     text-underline-offset: 2px;
 }
-.card-green a:hover, .card-amber a:hover, .card-purple a:hover {
+.card-green a:hover, .card-amber a:hover, .card-purple a:hover,
+.card-slate a:hover, .card-threads a:hover, .card-blue a:hover {
     text-decoration-color: #1D4ED8;
 }
 .stMarkdown strong {
@@ -194,6 +221,7 @@ with col_input:
         value="digital marketing and social media",
         placeholder="e.g. generative AI, climate tech, fintech…",
         label_visibility="collapsed",
+        key="topic_input",
     )
 
 with col_btn:
@@ -233,10 +261,12 @@ sections = {
         "SENTIMENT SNAPSHOT",
         "EMERGING SIGNAL",
         "SO WHAT",
+        "LEARN MORE",
     )
 }
 
 signals = parse_signals(raw)
+related_topics = parse_related_topics(raw)
 
 left, right = st.columns([2, 3], gap="large")
 
@@ -255,7 +285,10 @@ with left:
 
     if sections["SENTIMENT SNAPSHOT"]:
         st.markdown('<p class="meta-label">🧭 Sentiment Snapshot</p>', unsafe_allow_html=True)
-        st.markdown(sections["SENTIMENT SNAPSHOT"])
+        st.markdown(
+            f'<div class="card-slate">{md_to_html(sections["SENTIMENT SNAPSHOT"])}</div>',
+            unsafe_allow_html=True,
+        )
 
     st.write("")
 
@@ -263,6 +296,15 @@ with left:
         st.markdown('<p class="meta-label">🔬 Emerging Signal</p>', unsafe_allow_html=True)
         st.markdown(
             f'<div class="card-purple">{md_to_html(sections["EMERGING SIGNAL"])}</div>',
+            unsafe_allow_html=True,
+        )
+
+    st.write("")
+
+    if sections["LEARN MORE"]:
+        st.markdown('<p class="meta-label">📚 Learn More</p>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="card-blue">{md_to_html(sections["LEARN MORE"])}</div>',
             unsafe_allow_html=True,
         )
 
@@ -277,7 +319,10 @@ with right:
 
     if sections["NARRATIVE THREADS"]:
         st.markdown('<p class="meta-label">🧵 Narrative Threads</p>', unsafe_allow_html=True)
-        st.markdown(sections["NARRATIVE THREADS"])
+        st.markdown(
+            f'<div class="card-threads">{md_to_html(sections["NARRATIVE THREADS"])}</div>',
+            unsafe_allow_html=True,
+        )
 
     if sections["SO WHAT"]:
         st.markdown('<p class="meta-label">💡 So What</p>', unsafe_allow_html=True)
@@ -285,6 +330,18 @@ with right:
             f'<div class="card-amber">{md_to_html(sections["SO WHAT"])}</div>',
             unsafe_allow_html=True,
         )
+
+# ── Related Topics ──────────────────────────────────────────────────────────────────────────
+if related_topics:
+    st.write("")
+    st.divider()
+    st.markdown('<p class="meta-label">🔀 Explore Related Topics</p>', unsafe_allow_html=True)
+    cols = st.columns(len(related_topics))
+    for col, rt in zip(cols, related_topics):
+        with col:
+            if st.button(rt, key=f"rt_{rt}", use_container_width=True):
+                st.session_state["topic_input"] = rt
+                st.rerun()
 
 with st.expander("📄 Raw output"):
     st.markdown(raw)
