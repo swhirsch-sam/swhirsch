@@ -1,0 +1,252 @@
+import os
+import re
+from datetime import datetime
+
+import anthropic
+import streamlit as st
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Note: claude-sonnet-4-20250514 is deprecated (retiring Jun 15 2026);
+# swap for claude-sonnet-4-6 when ready.
+MODEL = "claude-sonnet-4-20250514"
+SEARCH_TOOL = [{"type": "web_search_20250305", "name": "web_search"}]
+
+
+@st.cache_resource
+def get_client() -> anthropic.Anthropic:
+    key = os.environ.get("ANTHROPIC_API_KEY")
+    if not key:
+        st.error("ANTHROPIC_API_KEY environment variable is not set.")
+        st.stop()
+    return anthropic.Anthropic(api_key=key)
+
+
+def run_research(topic: str) -> str:
+    client = get_client()
+
+    prompt = f"""You are a trend intelligence analyst. Search the web for the latest developments in: **{topic}**
+
+Write a structured trend brief using these exact section headers:
+
+**TOP STORY**
+
+2–3 sentences on the single most significant development right now. Cite the source (publication name or domain).
+
+**NARRATIVE THREADS**
+
+• Thread 1 name: 1–2 sentences
+
+• Thread 2 name: 1–2 sentences
+
+• Thread 3 name: 1–2 sentences
+
+**SENTIMENT SNAPSHOT**
+
+2–3 sentences on the overall mood—optimistic, cautious, uncertain—and what is driving it.
+
+**EMERGING SIGNAL**
+
+2–3 sentences on one early or weak signal not yet mainstream but worth watching.
+
+**SO WHAT**
+
+2–3 sentences on the key takeaway for a practitioner in this space.
+
+**TREND SIGNALS**
+
+4–6 short trend labels (2–5 words each), comma-separated.
+
+Example: AI-Generated Ads, Influencer Regulation, Shoppable Video"""
+
+    messages = [{"role": "user", "content": prompt}]
+
+    text = ""
+    for _ in range(5):  # max continuations for pause_turn
+        response = client.messages.create(
+            model=MODEL,
+            max_tokens=4096,
+            tools=SEARCH_TOOL,
+            messages=messages,
+        )
+
+        text = "".join(b.text for b in response.content if b.type == "text")
+
+        if response.stop_reason == "end_turn":
+            return text
+
+        if response.stop_reason == "pause_turn":
+            # Server-side search hit iteration cap; continue without a new user message.
+            # The API detects the trailing server_tool_use block and resumes automatically.
+            messages.append({"role": "assistant", "content": response.content})
+
+        else:
+            return text  # unexpected stop_reason; return what we have
+
+    return text
+
+
+def parse_section(text: str, header: str) -> str:
+    pattern = rf"\*\*{re.escape(header)}\*\*\s*(.*?)(?=\*\*[A-Z\s]{{2,}}\*\*|\Z)"
+    m = re.search(pattern, text, re.DOTALL)
+    return m.group(1).strip() if m else ""
+
+
+def parse_signals(text: str) -> list[str]:
+    raw = parse_section(text, "TREND SIGNALS")
+    if not raw:
+        return []
+    parts = re.split(r"[,\n;•\-–]", raw)
+    cleaned = [p.strip().strip("\"’*•–") for p in parts]
+    return [c for c in cleaned if 2 < len(c) <= 50][:6]
+
+
+# ── Page setup ──────────────────────────────────────────────────────────────────────────────
+st.set_page_config(
+    page_title="Trend Intelligence",
+    page_icon="📡",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
+
+st.markdown(
+    """
+<style>
+.chip {
+    display: inline-block;
+    padding: 4px 13px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 500;
+    margin: 3px 2px;
+    background: #EEF2FF;
+    color: #4338CA;
+    border: 1px solid #C7D2FE;
+}
+.meta-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: #6B7280;
+    margin: 0 0 6px;
+}
+.card-green  { background:#F0FDF4; border-left:4px solid #16A34A; padding:14px 18px;
+               border-radius:0 6px 6px 0; line-height:1.65; margin:6px 0 14px; }
+.card-amber  { background:#FFFBEB; border-left:4px solid #D97706; padding:14px 18px;
+               border-radius:0 6px 6px 0; line-height:1.65; margin:6px 0; }
+.card-purple { background:#FDF4FF; border-left:4px solid #9333EA; padding:14px 18px;
+               border-radius:0 6px 6px 0; line-height:1.65; margin:6px 0; }
+</style>
+""",
+    unsafe_allow_html=True,
+)
+
+# ── Header ─────────────────────────────────────────────────────────────────────────────────
+st.title("📡 Trend Intelligence Dashboard")
+st.caption("Real-time research synthesized by Claude · Powered by web search")
+
+# ── Input row ─────────────────────────────────────────────────────────────────────────────
+col_input, col_btn = st.columns([5, 1])
+
+with col_input:
+    topic = st.text_input(
+        "Topic",
+        value="digital marketing and social media",
+        placeholder="e.g. generative AI, climate tech, fintech…",
+        label_visibility="collapsed",
+    )
+
+with col_btn:
+    go = st.button("▶  Run Brief", type="primary", use_container_width=True)
+
+st.write("")
+
+# ── Fetch ─────────────────────────────────────────────────────────────────────────────────
+if go and topic.strip():
+    with st.spinner(f'Researching "{topic.strip()}"…'):
+        raw = run_research(topic.strip())
+
+    st.session_state.update(
+        raw=raw,
+        topic=topic.strip(),
+        fetched_at=datetime.now().strftime("%d %b %Y, %H:%M"),
+    )
+
+# ── Display ─────────────────────────────────────────────────────────────────────────────────
+if "raw" not in st.session_state:
+    st.info("Enter a topic above and click **▶ Run Brief** to generate a trend report.")
+    st.stop()
+
+raw = st.session_state["raw"]
+
+h1, h2 = st.columns([4, 1])
+with h1:
+    st.subheader(st.session_state["topic"].title())
+with h2:
+    st.caption(f"🕐 {st.session_state['fetched_at']}")
+
+sections = {
+    k: parse_section(raw, k)
+    for k in (
+        "TOP STORY",
+        "NARRATIVE THREADS",
+        "SENTIMENT SNAPSHOT",
+        "EMERGING SIGNAL",
+        "SO WHAT",
+    )
+}
+
+signals = parse_signals(raw)
+
+left, right = st.columns([2, 3], gap="large")
+
+# ── Left column ─────────────────────────────────────────────────────────────────────────────
+with left:
+    st.markdown('<p class="meta-label">🔖 Trending Topics</p>', unsafe_allow_html=True)
+    if signals:
+        st.markdown(
+            "".join(f'<span class="chip">{s}</span>' for s in signals),
+            unsafe_allow_html=True,
+        )
+    else:
+        st.caption("No signals extracted.")
+
+    st.write("")
+
+    if sections["SENTIMENT SNAPSHOT"]:
+        st.markdown('<p class="meta-label">🧭 Sentiment Snapshot</p>', unsafe_allow_html=True)
+        st.markdown(sections["SENTIMENT SNAPSHOT"])
+
+    st.write("")
+
+    if sections["EMERGING SIGNAL"]:
+        st.markdown('<p class="meta-label">🔬 Emerging Signal</p>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="card-purple">{sections["EMERGING SIGNAL"]}</div>',
+            unsafe_allow_html=True,
+        )
+
+# ── Right column ──────────────────────────────────────────────────────────────────────────────
+with right:
+    if sections["TOP STORY"]:
+        st.markdown('<p class="meta-label">🔥 Top Story</p>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="card-green">{sections["TOP STORY"]}</div>',
+            unsafe_allow_html=True,
+        )
+
+    if sections["NARRATIVE THREADS"]:
+        st.markdown('<p class="meta-label">🧵 Narrative Threads</p>', unsafe_allow_html=True)
+        st.markdown(sections["NARRATIVE THREADS"])
+
+    if sections["SO WHAT"]:
+        st.markdown('<p class="meta-label">💡 So What</p>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="card-amber">{sections["SO WHAT"]}</div>',
+            unsafe_allow_html=True,
+        )
+
+with st.expander("📄 Raw output"):
+    st.markdown(raw)
