@@ -382,13 +382,11 @@ with right:
 if related_topics:
     st.write("")
     st.divider()
-    st.markdown('<p class="meta-label">🔀 Explore Related Topics</p>', unsafe_allow_html=True)
-    cols = st.columns(len(related_topics))
-    for col, rt in zip(cols, related_topics):
-        with col:
-            if st.button(rt, key=f"rt_{rt}", use_container_width=True):
-                st.session_state["topic_input"] = rt
-                st.rerun()
+    st.markdown('<p class="meta-label">🔀 Related Topics</p>', unsafe_allow_html=True)
+    st.markdown(
+        "".join(f'<span class="chip">{rt}</span>' for rt in related_topics),
+        unsafe_allow_html=True,
+    )
 
 with st.expander("📄 Raw output"):
     st.markdown(raw)
